@@ -60,7 +60,11 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(User::class, 'user_follow', 'follow_id', 'user_id')->withTimestamps();
     }    
-    
+
+    public function favorites()
+    {
+        return $this->belongsToMany(Micropost::class, 'favorites', 'user_id', 'micropost_id')->withTimestamps();
+    }    
     
     
     /**
@@ -68,7 +72,7 @@ class User extends Authenticatable
      */
     public function loadRelationshipCounts()
     {
-        $this->loadCount(['microposts', 'followings', 'followers']);
+        $this->loadCount(['microposts', 'followings', 'followers', 'favorites']);
     }    
     /**
      * $userIdで指定されたユーザをフォローする。
@@ -141,4 +145,61 @@ class User extends Authenticatable
         // それらのユーザが所有する投稿に絞り込む
         return Micropost::whereIn('user_id', $userIds);
     }
+
+    public function favorite($micropostId)
+    {
+        // すでにお気に入りしているかの確認
+        $exist = $this->is_favorite($micropostId);
+        // 対象が自分自身かどうかの確認
+        $its_me = $this->id == $micropostId;
+
+        if ($exist || $its_me) {
+            // すでにお気に入りしていれば何もしない
+            return false;
+        } else {
+            // お気に入りしていなければお気に入りする
+            $this->favorites()->attach($micropostId);
+            return true;
+        }
+    }
+
+
+
+    /**
+     * $micropostIdで指定された投稿をお気に入りから外す。
+     *
+     * @param  int  $micropostId
+     * @return bool
+     */
+    public function unfavorite($micropostId)
+    {
+        // すでにお気に入りしているかの確認認
+        $exist = $this->is_favorite($micropostId);
+        // 対象が自分自身かどうかの確認
+        $its_me = $this->id == $micropostId;
+
+        if ($exist && !$its_me) {
+            // すでにお気に入りしていれば外す
+            $this->favorites()->detach($micropostId);
+            return true;
+        } else {
+            // お気に入りあれば何もしない
+            return false;
+        }
+    }
+
+    /**
+     * 指定された $userIdのユーザをこのユーザがフォロー中であるか調べる。フォロー中ならtrueを返す。
+     *
+     * @param  int  $userId
+     * @return bool
+     */
+    public function is_favorite($micropostId)
+    {
+        // フォロー中ユーザの中に $userIdのものが存在するか
+        return $this->favorites()->where('micropost_id', $micropostId)->exists();
+    }
+
+
+
 }
